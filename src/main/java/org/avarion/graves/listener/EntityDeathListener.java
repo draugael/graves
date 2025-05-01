@@ -164,44 +164,27 @@ public class EntityDeathListener implements EventExecutor {
         }
 
         // WorldGuard
-        if (plugin.getIntegrationManager().hasWorldGuard()) {
-            boolean hasCreateGrave = plugin.getIntegrationManager().getWorldGuard().hasCreateGrave(location);
-
-            if (hasCreateGrave) {
-                if (livingEntity instanceof Player) {
-                    if (!plugin.getIntegrationManager().getWorldGuard().canCreateGrave(livingEntity, location)) {
-                        plugin.getEntityManager()
-                              .sendMessage("message.region-create-deny", livingEntity, location, permissionList);
-                        plugin.debugMessage("Grave not created for "
-                                            + entityName
-                                            + " because they are in a region with graves-create set to deny", 2);
-
-                        return;
-                    }
-                }
-                else if (!plugin.getIntegrationManager().getWorldGuard().canCreateGrave(location)) {
-                    plugin.debugMessage("Grave not created for "
-                                        + entityName
-                                        + " because they are in a region with graves-create set to deny", 2);
-
-                    return;
-                }
+        if (plugin.getIntegrationManager().hasWorldGuard()
+            && plugin.getIntegrationManager().getWorldGuard().hasCreateGrave(location)
+            && !plugin.getIntegrationManager().getWorldGuard().canCreateGrave(livingEntity, location)
+        ) {
+            plugin.debugMessage("Grave not created for "
+                                + entityName
+                                + " because they are in a region with graves-create set to deny", 2);
+            if (livingEntity instanceof Player) {
+                plugin.getEntityManager().sendMessage("message.region-create-deny", livingEntity, location, permissionList);
+                this.keepInventory(plugin, livingEntity, event);
             }
-            else if (!plugin.getLocationManager().canBuild(livingEntity, location, permissionList)) {
-                plugin.getEntityManager().sendMessage("message.build-denied", livingEntity, location, permissionList);
-                plugin.debugMessage("Grave not created for "
-                                    + entityName
-                                    + " because they don't have permission to build where they died", 2);
-
-                return;
-            }
+            return;
         }
-        else if (!plugin.getLocationManager().canBuild(livingEntity, location, permissionList)) {
+
+        // Can build
+        if (!plugin.getLocationManager().canBuild(livingEntity, location, permissionList)) {
             plugin.getEntityManager().sendMessage("message.build-denied", livingEntity, location, permissionList);
             plugin.debugMessage("Grave not created for "
                                 + entityName
                                 + " because they don't have permission to build where they died", 2);
-
+            this.keepInventory(plugin, livingEntity, event);
             return;
         }
 
@@ -517,6 +500,20 @@ public class EntityDeathListener implements EventExecutor {
         }
         else {
             plugin.debugMessage("Grave not created for " + entityName + " because they had no drops", 2);
+        }
+    }
+
+    private void keepInventory(Graves plugin, LivingEntity livingEntity, EntityDeathEvent event) {
+        if (event instanceof PlayerDeathEvent playerDeathEvent
+            && plugin.getConfigBool("placement.failure-keep-inventory", livingEntity)) {
+
+            try {
+                playerDeathEvent.setKeepLevel(true);
+                playerDeathEvent.setKeepInventory(true);
+                plugin.getEntityManager().sendMessage("message.failure-keep-inventory", livingEntity);
+            }
+            catch (NoSuchMethodError ignored) {
+            }
         }
     }
 
